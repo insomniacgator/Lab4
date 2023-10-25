@@ -265,12 +265,24 @@ sched_ErrCode_t G8RTOS_AddThread(void (*threadToAdd)(void), uint8_t priority, ch
 // Return: sched_ErrCode_t
 sched_ErrCode_t G8RTOS_Add_APeriodicEvent(void (*AthreadToAdd)(void), uint8_t priority, int32_t IRQn) {
     // Disable interrupts
+    IBit_State = StartCriticalSection();
     // Check if IRQn is valid
+    if ( IRQn >= 255 | IRQn <= 0)
+        return IRQn_INVALID;
     // Check if priority is valid
+    if (priority > 6)
+        return HWI_PRIORITY_INVALID;
     // Set corresponding index in interrupt vector table to handler.
+    IntRegister(IRQn, AthreadToAdd);
     // Set priority.
+    IntPrioritySet(IRQn, priority);
     // Enable the interrupt.
+    IntEnable(IRQn);
+    //IntMasterEnable();
     // End the critical section.
+    EndCriticalSection(IBit_State);
+
+    return NO_ERROR;
 
 }
 
@@ -284,6 +296,8 @@ sched_ErrCode_t G8RTOS_Add_APeriodicEvent(void (*AthreadToAdd)(void), uint8_t pr
 // Return: sched_ErrCode_t
 sched_ErrCode_t G8RTOS_Add_PeriodicEvent(void (*PThreadToAdd)(void), uint32_t period, uint32_t execution) {
     // your code
+
+
     // Make sure that the number of PThreads is not greater than max PThreads.
         // Check if there is no PThread. Initialize and set the first PThread.
         // Subsequent PThreads should be added, inserted similarly to a doubly-linked linked list
