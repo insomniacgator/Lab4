@@ -46,7 +46,7 @@ int32_t G8RTOS_InitFIFO(uint32_t FIFO_index) {
     G8RTOS_FIFO_t *fifo = &FIFOs[FIFO_index];
     fifo->head = 0;
     fifo->tail = 0;
-    fifo->test = 4745;
+    //fifo->test = 4745;
 
     // Init the mutex, current size
     fifo->mutex = 1;

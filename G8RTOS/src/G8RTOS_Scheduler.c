@@ -40,6 +40,9 @@ static uint32_t NumberOfPThreads;
 
 static uint32_t threadCounter = 0;
 
+static tcb_t *headTCB = 0;
+static tcb_t *tailTCB = 0;
+
 /*******************************Private Functions***********************************/
 
 // Occurs every 1 ms.
@@ -89,26 +92,37 @@ tcb_t* CurrentlyRunningThread;
 // Return: void
 void SysTick_Handler() {
     SystemTime++;
-
+    // add periodic thread set to system time
 
 
     // Traverse the linked-list to find which threads should be awake.
     // Here we will compare sleepCount to SystemTime and wake up threads if it is their time
     //tcb_t *pt = (tcb_t *)&CurrentlyRunningThread->nextTCB;
-    tcb_t *pt = (tcb_t *)&threadControlBlocks[0];
+
+    //tcb_t *pt = (tcb_t *)&threadControlBlocks[0];
+    // we'll change the way we get the head since the array is not in sync w/ the linked list anymore
+    tcb_t *pt = headTCB; // get a pointer to the first thread of the linked list
 
     // HERE: to traverse the linked list: should I use condition to stop: next==null? or loop numberOfThreads times?
     for (int16_t i=0; i< NumberOfThreads; i++)
     {
-        if ( pt->sleepCount <= SystemTime)
+        if ( pt->sleepCount <= SystemTime) // if sleepCount is less than systime means its time to wake up
         {
-            pt->asleep = 0;
-            pt->sleepCount = 0;
+            pt->asleep = 0; // wake up
+            pt->sleepCount = 0; // reset sleep count to 0
         }
-        pt = pt->nextTCB;
+        pt = pt->nextTCB; // if its not time to wake up skip to the next.
     }
 
     // Traverse the periodic linked list to run which functions need to be run.
+    ptcb_t *ppt = (ptcb_t *)&pthreadControlBlocks[0];
+    for (int16_t i=0; i < NumberOfPThreads; i++)
+    {
+        if ( ppt->executeTime <= SystemTime )
+        {
+            ppt->handler();
+        }
+    }
 
     // set PendSV flag to start scheduler
     HWREG(NVIC_INT_CTRL) |= NVIC_INT_CTRL_PEND_SV; // am I supposed to trigger the interrupt or just set the flag?
@@ -163,7 +177,8 @@ void G8RTOS_Scheduler() {
     // is not blocked or asleep. Set current thread to this thread's TCB.
 
 
-    tcb_t *pt = (tcb_t *)&threadControlBlocks[0];
+    //tcb_t *pt = (tcb_t *)&threadControlBlocks[0];
+    tcb_t *pt = headTCB;
     tcb_t *highest = 0;
 
     // HERE: to traverse the linked list: should I use condition to stop: next==null? or loop numberOfThreads times?
@@ -211,32 +226,57 @@ sched_ErrCode_t G8RTOS_AddThread(void (*threadToAdd)(void), uint8_t priority, ch
             // We need to modify Add Thread so we can add threads where the dead threads where and not just at the end.
             // we should traverse ThreadControlBlocks array by incrementing index and find dead threads and write there.
 
-            // if no threads
-            if ( NumberOfThreads == 0)
+            // if no threads we just set our thread at slot 0 in the array
+            if ( threadCounter == 0)
             {
                 // set thread as HEAD and TAIL
                 threadControlBlocks[0].nextTCB = &threadControlBlocks[0];
                 threadControlBlocks[0].previousTCB = &threadControlBlocks[0];
-                //threadControlBlocks[0].threadName = name;
+
                 strcpy(threadControlBlocks[0].threadName, name);
                 threadControlBlocks[0].priority = priority;
                 threadControlBlocks[0].ThreadID = threadCounter;
-                threadCounter++;
+                headTCB = &threadControlBlocks[0];
+                tailTCB = &threadControlBlocks[0];
 
                 // set currently running thread
             }
             // else
-            else
+            else if ( threadCounter >= MAX_THREADS) // we just keep filling that array until we get to MAX_THREADS
             {
-                threadControlBlocks[NumberOfThreads - 1].nextTCB = &threadControlBlocks[NumberOfThreads];
-                threadControlBlocks[0].previousTCB = &threadControlBlocks[NumberOfThreads]; // we wrap around for round-robin scheduling
-                threadControlBlocks[NumberOfThreads].previousTCB = &threadControlBlocks[NumberOfThreads - 1];
-                threadControlBlocks[NumberOfThreads].nextTCB = &threadControlBlocks[0];
-                //threadControlBlocks[NumberOfThreads].threadName = name;
-                strcpy(threadControlBlocks[NumberOfThreads].threadName, name);
-                threadControlBlocks[NumberOfThreads].priority = priority;
-                threadControlBlocks[NumberOfThreads].ThreadID = threadCounter;
-                threadCounter++;
+                threadControlBlocks[threadCounter].previousTCB = tailTCB;
+                threadControlBlocks[threadCounter].nextTCB = headTCB;
+                headTCB->previousTCB = &threadControlBlocks[threadCounter];
+                tailTCB->nextTCB = &threadControlBlocks[threadCounter];
+
+                strcpy(threadControlBlocks[threadCounter].threadName, name);
+                threadControlBlocks[threadCounter].priority = priority;
+                threadControlBlocks[threadCounter].ThreadID = threadCounter;
+            }
+            else // once that array is full we have to traverse the array looking for a dead thread to replace.
+            {
+                // however we will add at the end of the linked list however regardless of the place in the TCB array.
+
+                int8_t index = 0;
+                // we traverse the TCB array until we find a dead thread, if we cant find a dead thread we return
+                while (threadControlBlocks[index].isAlive)
+                {
+                    index++;
+                    if (index >= MAX_THREADS)
+                        return THREAD_LIMIT_REACHED;
+                }
+                // if we here it means that we found a dead thread at index
+                threadControlBlocks[index].previousTCB = tailTCB; // so point the new thread's previous pointer to the old tail
+                threadControlBlocks[index].nextTCB = headTCB; // point the new thread's next pointer to the head
+
+                tailTCB->nextTCB = &threadControlBlocks[index]; //point the old tail's next pointer to the new thread ( new tail )
+                headTCB->previousTCB = &threadControlBlocks[index]; // point the head's previous pointer to the new thread ( new tail )
+
+                tailTCB = &threadControlBlocks[index]; // make the new thread the new tail
+
+                strcpy(threadControlBlocks[index].threadName, name); // copy name string into threadName
+                threadControlBlocks[index].priority = priority; // set priority
+                threadControlBlocks[index].ThreadID = threadCounter; // set threadID from threadCounter
             }
                 /*
                 Append the new thread to the end of the linked list
@@ -254,6 +294,7 @@ sched_ErrCode_t G8RTOS_AddThread(void (*threadToAdd)(void), uint8_t priority, ch
             // from the bottom of the stack. (we use 16 because last spot is STACKSIZE-1, ie count starts from 0. also we do not save SP (but into).
 
             NumberOfThreads++;
+            threadCounter++;
             EndCriticalSection(IBit_State);
             return NO_ERROR;
         }
@@ -284,7 +325,7 @@ sched_ErrCode_t G8RTOS_Add_APeriodicEvent(void (*AthreadToAdd)(void), uint8_t pr
     IntPrioritySet(IRQn, priority);
     // Enable the interrupt.
     IntEnable(IRQn);
-    //IntMasterEnable();
+    //IntMasterEnable(); Do I need to add this here?
     // End the critical section.
     EndCriticalSection(IBit_State);
 
@@ -305,13 +346,35 @@ sched_ErrCode_t G8RTOS_Add_PeriodicEvent(void (*PThreadToAdd)(void), uint32_t pe
 
 
     // Make sure that the number of PThreads is not greater than max PThreads.
-        // Check if there is no PThread. Initialize and set the first PThread.
-        // Subsequent PThreads should be added, inserted similarly to a doubly-linked linked list
-            // last PTCB should point to first, last PTCB should point to last.
-        // Set function
-        // Set period
-        // Set execute time
-        // Increment number of PThreads
+    if (NumberOfPThreads >= MAX_PTHREADS)
+        return THREAD_LIMIT_REACHED;
+    // Check if there is no PThread. Initialize and set the first PThread.
+    if ( NumberOfPThreads == 0)
+    {
+        // set same only thread as next and previous
+        pthreadControlBlocks[0].nextPTCB = &pthreadControlBlocks[0];
+        pthreadControlBlocks[0].previousPTCB = &pthreadControlBlocks[0];
+    }
+    // else set the last thread next to the this thread and the first thread previous to this thread
+    else
+    {
+        pthreadControlBlocks[NumberOfPThreads - 1].nextPTCB = &pthreadControlBlocks[NumberOfPThreads];
+        pthreadControlBlocks[0].previousPTCB = &pthreadControlBlocks[NumberOfPThreads];
+
+        pthreadControlBlocks[NumberOfPThreads].previousPTCB = &pthreadControlBlocks[NumberOfPThreads - 1];
+        pthreadControlBlocks[NumberOfPThreads].nextPTCB = &pthreadControlBlocks[0];
+    }
+
+    // Subsequent PThreads should be added, inserted similarly to a doubly-linked linked list
+        // last PTCB should point to first, last PTCB should point to last.
+    // Set function
+    pthreadControlBlocks[NumberOfPThreads].handler = PThreadToAdd;
+    // Set period
+    pthreadControlBlocks[NumberOfPThreads].period = period;
+    // Set execute time
+    pthreadControlBlocks[NumberOfPThreads].executeTime = execution;
+    // Increment number of PThreads
+    NumberOfPThreads++;
 
     return NO_ERROR;
 }
@@ -324,23 +387,44 @@ sched_ErrCode_t G8RTOS_KillThread(threadID_t threadID) {
     IBit_State = StartCriticalSection();
     // Check if there is only one thread, return if so
     if (NumberOfThreads <= 1)
+    {
+        EndCriticalSection(IBit_State);
         return CANNOT_KILL_LAST_THREAD;
+    }
     // Traverse linked list, find thread to kill
     uint8_t index = 0;
-    // grab first thread that is alive from ThreadControlBlocks
-    while ( !ThreadControlBlocks[index].isAlive )
+    tcb_t *thread = headTCB;
+    // while threadID does not match any of the threads IDs
+    while ( !thread->ThreadID == threadID )
     {
+        // keep traversing the linked list
         index++;
+        thread = thread->nextTCB;
+        if (index >= NumberOfThreads)
+        {
+            EndCriticalSection(IBit_State);
+            return THREAD_DOES_NOT_EXIST;
+        }
     }
-    tcb_t *thread = &ThreadControlBlocks[index];
-    if (thread->ThreadID == threadID)
-    {
-        thread->nextTCB->previousTCB = thread->previousTCB;
-        thread->previousTCB->nextTCB = thread->nextTCB;
-        thread->isAlive = 0;
+    // if we are here we have a thread that matched threadID so we will kill it
 
+    // we remove the thread from the linked list
+    thread->nextTCB->previousTCB = thread->previousTCB;
+    thread->previousTCB->nextTCB = thread->nextTCB;
 
-    }
+    // what if we killed the head or the tail??
+    if (thread == headTCB)
+        headTCB = thread->nextTCB;
+    if (thread == tailTCB)
+        tailTCB = thread->previousTCB;
+
+    // we set alive is 0 (kill it)
+    thread->isAlive = 0;
+    // if thread is blocked we signal the semaphore to release it
+    if (thread->blocked)
+        G8RTOS_SignalSemaphore(thread->blocked);
+    NumberOfThreads--; // decrement number of threads
+
         // Update the next tcb and prev tcb pointers if found
             // mark as not alive, release the semaphore it is blocked on
         // Otherwise, thread does not exist.
@@ -357,9 +441,44 @@ sched_ErrCode_t G8RTOS_KillThread(threadID_t threadID) {
 // Return: sched_ErrCode_t
 sched_ErrCode_t G8RTOS_KillSelf() {
     // your code
+    IBit_State = StartCriticalSection();
 
     // Check if there is only one thread
+    if (NumberOfThreads <= 1)
+    {
+        EndCriticalSection(IBit_State);
+            return CANNOT_KILL_LAST_THREAD;
+    }
+
+
     // Else, mark this thread as not alive.
+
+    tcb_t *thread = CurrentlyRunningThread;
+
+    // we remove the thread from the linked list
+    thread->nextTCB->previousTCB = thread->previousTCB;
+    thread->previousTCB->nextTCB = thread->nextTCB;
+
+    // what if we killed the head or the tail??
+    if (thread == headTCB)
+        headTCB = thread->nextTCB;
+    if (thread == tailTCB)
+        tailTCB = thread->previousTCB;
+
+    // we set alive is 0 (kill it)
+    thread->isAlive = 0;
+    // if thread is blocked we signal the semaphore to release it
+    if (thread->blocked)
+        G8RTOS_SignalSemaphore(thread->blocked);
+    NumberOfThreads--; // decrement number of threads
+
+        // Update the next tcb and prev tcb pointers if found
+            // mark as not alive, release the semaphore it is blocked on
+        // Otherwise, thread does not exist.
+
+    EndCriticalSection(IBit_State);
+
+    return NO_ERROR;
 
 }
 
