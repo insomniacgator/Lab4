@@ -199,6 +199,7 @@ sched_ErrCode_t G8RTOS_AddThread(void (*threadToAdd)(void), uint8_t priority, ch
 
     // This should be in a critical section! <---- But why?
     IBit_State = StartCriticalSection();
+    //static int32_t thread_id = 0;
 
     // If number of threads is greater than the maximum number of threads
         if ( NumberOfThreads > MAX_THREADS )
@@ -207,7 +208,8 @@ sched_ErrCode_t G8RTOS_AddThread(void (*threadToAdd)(void), uint8_t priority, ch
         // else
         else
         {
-
+            // We need to modify Add Thread so we can add threads where the dead threads where and not just at the end.
+            // we should traverse ThreadControlBlocks array by incrementing index and find dead threads and write there.
 
             // if no threads
             if ( NumberOfThreads == 0)
@@ -218,19 +220,23 @@ sched_ErrCode_t G8RTOS_AddThread(void (*threadToAdd)(void), uint8_t priority, ch
                 //threadControlBlocks[0].threadName = name;
                 strcpy(threadControlBlocks[0].threadName, name);
                 threadControlBlocks[0].priority = priority;
+                threadControlBlocks[0].ThreadID = threadCounter;
+                threadCounter++;
 
                 // set currently running thread
             }
             // else
             else
             {
-                threadControlBlocks[NumberOfThreads - 1].nextTCB = &threadControlBlocks[NumberOfThreads]; // we wrap around for round-robin scheduling
-                threadControlBlocks[0].previousTCB = &threadControlBlocks[NumberOfThreads];
+                threadControlBlocks[NumberOfThreads - 1].nextTCB = &threadControlBlocks[NumberOfThreads];
+                threadControlBlocks[0].previousTCB = &threadControlBlocks[NumberOfThreads]; // we wrap around for round-robin scheduling
                 threadControlBlocks[NumberOfThreads].previousTCB = &threadControlBlocks[NumberOfThreads - 1];
                 threadControlBlocks[NumberOfThreads].nextTCB = &threadControlBlocks[0];
                 //threadControlBlocks[NumberOfThreads].threadName = name;
                 strcpy(threadControlBlocks[NumberOfThreads].threadName, name);
                 threadControlBlocks[NumberOfThreads].priority = priority;
+                threadControlBlocks[NumberOfThreads].ThreadID = threadCounter;
+                threadCounter++;
             }
                 /*
                 Append the new thread to the end of the linked list
@@ -315,11 +321,33 @@ sched_ErrCode_t G8RTOS_Add_PeriodicEvent(void (*PThreadToAdd)(void), uint32_t pe
 // Return: sched_ErrCode_t
 sched_ErrCode_t G8RTOS_KillThread(threadID_t threadID) {
     // Start critical section
+    IBit_State = StartCriticalSection();
     // Check if there is only one thread, return if so
+    if (NumberOfThreads <= 1)
+        return CANNOT_KILL_LAST_THREAD;
     // Traverse linked list, find thread to kill
+    uint8_t index = 0;
+    // grab first thread that is alive from ThreadControlBlocks
+    while ( !ThreadControlBlocks[index].isAlive )
+    {
+        index++;
+    }
+    tcb_t *thread = &ThreadControlBlocks[index];
+    if (thread->ThreadID == threadID)
+    {
+        thread->nextTCB->previousTCB = thread->previousTCB;
+        thread->previousTCB->nextTCB = thread->nextTCB;
+        thread->isAlive = 0;
+
+
+    }
         // Update the next tcb and prev tcb pointers if found
             // mark as not alive, release the semaphore it is blocked on
         // Otherwise, thread does not exist.
+
+    EndCriticalSection(IBit_State);
+
+    return NO_ERROR;
 
 
 }
