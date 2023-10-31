@@ -13,7 +13,10 @@
 #include "./MultimodDrivers/multimod.h"
 #include <stdint.h>
 #include <driverlib/uartstdio.h>
+#include <driverlib/interrupt.h>
 #include "./threads.h"
+
+extern uint32_t SystemTime;
 
 
 // Complete the functions below as test threads.
@@ -59,6 +62,26 @@ void task2() {
         }
 }
 
+void aperiodic_task() {
+    GPIOIntClear(GPIO_PORTF_BASE, GPIO_PIN_0);
+    static uint32_t aperiodic_count = 0;
+    //G8RTOS_WaitSemaphore(&sem_UART);
+    UARTprintf("Aperiodic counter is at: %d\n", aperiodic_count);
+
+    //G8RTOS_SignalSemaphore(&sem_UART);
+    aperiodic_count++;
+}
+
+void periodic_task() {
+    //GPIOIntClear(GPIO_PORTF_BASE, GPIO_PIN_4);
+    static uint32_t periodic_count = 0;
+    G8RTOS_WaitSemaphore(&sem_UART);
+    UARTprintf("This is a periodic counter is at: %d\n", periodic_count);
+
+    G8RTOS_SignalSemaphore(&sem_UART);
+    periodic_count++;
+}
+
 void idle() {
     while(1);
 }
@@ -74,17 +97,58 @@ int main(void)
     G8RTOS_Init();
     multimod_init();
 
+    // Init button+interrupt stuff
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
+    //SYSCTL_RCGCGPIO_R |= SYSCTL_RCGCGPIO_R5; // here we can use either one;
+    // Enable relevant port for launchpad switches
+    //GPIO_PORTF_DEN_R |= 0x00000001; // digital enable PF0
+    GPIO_PORTF_DEN_R |= 0x00000010; // digital enable PF4
+    // set up pull up resistors
+    //GPIO_PORTF_PUR_R |= 0x00000010;
+    // Configure SW1 input
+    //GPIO_PORTF_DIR_R |= ~0x00000011; // set pins 0 and 4 as inputs
+
+    GPIO_PORTF_LOCK_R = GPIO_LOCK_KEY;
+        GPIO_PORTF_CR_R |= GPIO_PIN_0;
+
+        // Enable port F for switches
+        GPIO_PORTF_DEN_R |= 0x00000001; // digital enable PF0
+        GPIO_PORTF_DEN_R |= 0x00000010; // digital enable PF4
+
+        // set up pull up resistors (do I even need this?)
+        GPIO_PORTF_PUR_R |= 0x00000011;
+
+        // Use SW1 & SW2, configure as inputs.
+        GPIO_PORTF_DIR_R |= ~0x00000011; // set pins 0 and 4 as inputs //I think this is wrong
+
+
+
+    //GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_4);
+
+    GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_PIN_0, GPIO_FALLING_EDGE);
+    GPIOIntEnable(GPIO_PORTF_BASE, GPIO_INT_PIN_0);
+    //IntPrioritySet(INT_GPIOF, 0xE0);
+
+
+
     // Add threads, semaphores, here
     G8RTOS_InitSemaphore(&sem_UART, 1);
     G8RTOS_AddThread(task0, 8, "task 0");
-    G8RTOS_AddThread(task1, 0, "task 1");
+    G8RTOS_AddThread(task1, 9, "task 1");
     //G8RTOS_AddThread(task2, 3, "task 2");
     G8RTOS_AddThread(idle, 255, "idle");
+    //G8RTOS_AddPThread()
+    G8RTOS_Add_APeriodicEvent(aperiodic_task, 4, 46);
+
+    G8RTOS_Add_PeriodicEvent(periodic_task, 400, SystemTime + 100);
+
 
     G8RTOS_InitFIFO(0);
 
 
     G8RTOS_Launch();
+
+    IntMasterEnable();
     while (1);
 }
 

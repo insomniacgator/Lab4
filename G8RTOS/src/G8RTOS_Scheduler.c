@@ -114,15 +114,22 @@ void SysTick_Handler() {
         pt = pt->nextTCB; // if its not time to wake up skip to the next.
     }
 
+
     // Traverse the periodic linked list to run which functions need to be run.
-    ptcb_t *ppt = (ptcb_t *)&pthreadControlBlocks[0];
-    for (int16_t i=0; i < NumberOfPThreads; i++)
+    ptcb_t *ppt = (ptcb_t *)&pthreadControlBlocks[0]; // we get the first periodic thread from pthread array
+    for (int16_t i=0; i < NumberOfPThreads; i++) // we are gonna loop for as many pthreads that we have in our array
     {
-        if ( ppt->executeTime <= SystemTime )
+        if ( ppt->executeTime <= SystemTime ) // we check if it is time to execute periodic thread
         {
-            ppt->handler();
+            ppt->handler(); // if it is time to execute we execute the thread;
+            ppt->executeTime = SystemTime + ppt->period; // and we set its new execute time to current SystemTime + period
         }
+        ppt = ppt->nextPTCB; // we go to the next pthread in the linked list (I guess we could have also use array and index here)
     }
+
+
+
+
 
     // set PendSV flag to start scheduler
     HWREG(NVIC_INT_CTRL) |= NVIC_INT_CTRL_PEND_SV; // am I supposed to trigger the interrupt or just set the flag?
@@ -240,9 +247,16 @@ sched_ErrCode_t G8RTOS_AddThread(void (*threadToAdd)(void), uint8_t priority, ch
                 tailTCB = &threadControlBlocks[0];
 
                 // set currently running thread
+                threadStacks[0][STACKSIZE - 2] = (uint32_t)threadToAdd; //we set the function pointer into the PC register 2 spots
+                // the from bottom of the stack
+                threadStacks[0][STACKSIZE - 1] = THUMBBIT; // we set THUMBIT on the PSR word spot (last item, bottom of stack)
+                threadControlBlocks[0].stackPointer = &threadStacks[0][STACKSIZE - 16]; // we put the SP up 15 places
+                // from the bottom of the stack. (we use 16 because last spot is STACKSIZE-1, ie count starts from 0. also we do not save SP (but into).
+                threadControlBlocks[0].isAlive = 1;
+                threadControlBlocks[0].asleep = 0;
             }
             // else
-            else if ( threadCounter >= MAX_THREADS) // we just keep filling that array until we get to MAX_THREADS
+            else if ( threadCounter <= MAX_THREADS) // we just keep filling that array until we get to MAX_THREADS
             {
                 threadControlBlocks[threadCounter].previousTCB = tailTCB;
                 threadControlBlocks[threadCounter].nextTCB = headTCB;
@@ -252,6 +266,15 @@ sched_ErrCode_t G8RTOS_AddThread(void (*threadToAdd)(void), uint8_t priority, ch
                 strcpy(threadControlBlocks[threadCounter].threadName, name);
                 threadControlBlocks[threadCounter].priority = priority;
                 threadControlBlocks[threadCounter].ThreadID = threadCounter;
+
+                threadStacks[threadCounter][STACKSIZE - 2] = (uint32_t)threadToAdd; //we set the function pointer into the PC register 2 spots
+                // the from bottom of the stack
+                threadStacks[threadCounter][STACKSIZE - 1] = THUMBBIT; // we set THUMBIT on the PSR word spot (last item, bottom of stack)
+                threadControlBlocks[threadCounter].stackPointer = &threadStacks[threadCounter][STACKSIZE - 16]; // we put the SP up 15 places
+                // from the bottom of the stack. (we use 16 because last spot is STACKSIZE-1, ie count starts from 0. also we do not save SP (but into).
+                threadControlBlocks[threadCounter].isAlive = 1;
+                threadControlBlocks[threadCounter].asleep = 0;
+
             }
             else // once that array is full we have to traverse the array looking for a dead thread to replace.
             {
@@ -277,6 +300,16 @@ sched_ErrCode_t G8RTOS_AddThread(void (*threadToAdd)(void), uint8_t priority, ch
                 strcpy(threadControlBlocks[index].threadName, name); // copy name string into threadName
                 threadControlBlocks[index].priority = priority; // set priority
                 threadControlBlocks[index].ThreadID = threadCounter; // set threadID from threadCounter
+
+
+                threadStacks[index][STACKSIZE - 2] = (uint32_t)threadToAdd; //we set the function pointer into the PC register 2 spots
+                // the from bottom of the stack
+                threadStacks[index][STACKSIZE - 1] = THUMBBIT; // we set THUMBIT on the PSR word spot (last item, bottom of stack)
+                threadControlBlocks[index].stackPointer = &threadStacks[index][STACKSIZE - 16]; // we put the SP up 15 places
+                // from the bottom of the stack. (we use 16 because last spot is STACKSIZE-1, ie count starts from 0. also we do not save SP (but into).
+                threadControlBlocks[index].isAlive = 1;
+                threadControlBlocks[index].asleep = 0;
+
             }
                 /*
                 Append the new thread to the end of the linked list
@@ -287,11 +320,7 @@ sched_ErrCode_t G8RTOS_AddThread(void (*threadToAdd)(void), uint8_t priority, ch
                 * 5. Point the previousTCB of the new thread to the current thread so that it moves in the correct order
                 */
 
-            threadStacks[NumberOfThreads][STACKSIZE - 2] = (uint32_t)threadToAdd; //we set the function pointer into the PC register 2 spots
-            // the from bottom of the stack
-            threadStacks[NumberOfThreads][STACKSIZE - 1] = THUMBBIT; // we set THUMBIT on the PSR word spot (last item, bottom of stack)
-            threadControlBlocks[NumberOfThreads].stackPointer = &threadStacks[NumberOfThreads][STACKSIZE - 16]; // we put the SP up 15 places
-            // from the bottom of the stack. (we use 16 because last spot is STACKSIZE-1, ie count starts from 0. also we do not save SP (but into).
+
 
             NumberOfThreads++;
             threadCounter++;
@@ -320,7 +349,8 @@ sched_ErrCode_t G8RTOS_Add_APeriodicEvent(void (*AthreadToAdd)(void), uint8_t pr
     if (priority > 6)
         return HWI_PRIORITY_INVALID;
     // Set corresponding index in interrupt vector table to handler.
-    IntRegister(IRQn, AthreadToAdd);
+    uint32_t *vectors = (uint32_t*)HWREG(NVIC_VTABLE);
+    vectors[IRQn] = (uint32_t) AthreadToAdd;
     // Set priority.
     IntPrioritySet(IRQn, priority);
     // Enable the interrupt.
