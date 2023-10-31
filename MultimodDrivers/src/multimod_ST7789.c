@@ -97,8 +97,25 @@ void ST7789_SetWindow(int16_t x, int16_t y, int16_t w, int16_t h) {
     // Your code here!
 
     // Check boundary conditions
+    if (x < 0  || x > 239 || y < 0 || y > 319 || w <= 0 || h <= 0)
+        {
+            // Invalid parameters, handle or return an error
+            return;
+        }
+
     // Set column address
+    ST7789_WriteCommand(ST7789_CASET_ADDR); // Column Address Set command
+    ST7789_WriteData(x >> 8);               // Start column high byte
+    ST7789_WriteData(x & 0xFF);             // Start column low byte
+    ST7789_WriteData((x + w - 1) >> 8);     // End column high byte
+    ST7789_WriteData((x + w - 1) & 0xFF);   // End column low byte
+
     // Set row address
+    ST7789_WriteCommand(ST7789_RASET_ADDR); // Row Address Set command
+    ST7789_WriteData(y >> 8);               // Start row high byte
+    ST7789_WriteData(y & 0xFF);             // Start row low byte
+    ST7789_WriteData((y + h - 1) >> 8);     // End row high byte
+    ST7789_WriteData((y + h - 1) & 0xFF);   // End row low byte
 
     // Set register to write to as memory
     ST7789_WriteCommand(ST7789_RAMWR_ADDR);
@@ -291,8 +308,16 @@ void ST7789_Init() {
 // Return: void
 void ST7789_DrawPixel(uint16_t x, uint16_t y, uint16_t color) {
     // Check boundary conditions
+    if (x < 0  || x > 239 || y < 0 || y > 319)
+            {
+                // Invalid parameters, handle or return an error
+                return;
+            }
         // Set window
+        ST7789_SetWindow(x, y, 1, 1);
         // Set color
+        ST7789_WriteData(color >> 8);   // Send high byte of color
+        ST7789_WriteData(color & 0xFF); // Send low byte of color
 }
 
 // ST7789_DrawPixel
