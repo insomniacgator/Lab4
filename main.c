@@ -42,7 +42,7 @@ void task1() {
             int32_t rslt = G8RTOS_ReadFIFO(0);
             G8RTOS_WaitSemaphore(&sem_UART);
 
-            UARTprintf("Task 1 counter is at: %d and Task 0 counter (fifo):%d \n", counter1, rslt);
+            UARTprintf("Task 1 counter is at: %d, task 0 counter (fifo):%d \n", counter1, rslt);
             G8RTOS_SignalSemaphore(&sem_UART);
             counter1++;
             sleep(1000);
@@ -134,13 +134,13 @@ int main(void)
     // Add threads, semaphores, here
     G8RTOS_InitSemaphore(&sem_UART, 1);
     G8RTOS_AddThread(task0, 8, "task 0");
-    G8RTOS_AddThread(task1, 9, "task 1");
+    G8RTOS_AddThread(task1, 2, "task 1");
     //G8RTOS_AddThread(task2, 3, "task 2");
     G8RTOS_AddThread(idle, 255, "idle");
     //G8RTOS_AddPThread()
-    G8RTOS_Add_APeriodicEvent(aperiodic_task, 4, 46);
+    //G8RTOS_Add_APeriodicEvent(aperiodic_task, 4, 46);
 
-    G8RTOS_Add_PeriodicEvent(periodic_task, 400, SystemTime + 100);
+    //G8RTOS_Add_PeriodicEvent(periodic_task, 400, SystemTime + 100);
 
 
     G8RTOS_InitFIFO(0);

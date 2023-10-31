@@ -185,11 +185,12 @@ void G8RTOS_Scheduler() {
 
 
     //tcb_t *pt = (tcb_t *)&threadControlBlocks[0];
-    tcb_t *pt = headTCB;
+    tcb_t *pt = CurrentlyRunningThread;
     tcb_t *highest = 0;
 
     // HERE: to traverse the linked list: should I use condition to stop: next==null? or loop numberOfThreads times?
     for (int16_t i=0; i< NumberOfThreads; i++)
+    //while (headTCB->ThreadID != pt->nextTCB->ThreadID)
     {
         if ( !pt->blocked && !pt->asleep )
         {
@@ -262,6 +263,8 @@ sched_ErrCode_t G8RTOS_AddThread(void (*threadToAdd)(void), uint8_t priority, ch
                 threadControlBlocks[threadCounter].nextTCB = headTCB;
                 headTCB->previousTCB = &threadControlBlocks[threadCounter];
                 tailTCB->nextTCB = &threadControlBlocks[threadCounter];
+
+                tailTCB = &threadControlBlocks[threadCounter];
 
                 strcpy(threadControlBlocks[threadCounter].threadName, name);
                 threadControlBlocks[threadCounter].priority = priority;
