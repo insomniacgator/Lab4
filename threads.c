@@ -79,7 +79,13 @@ void CamMove_Thread(void) {
         // Update world camera position. Update y/z coordinates depending on the joystick toggle.
         if (joystick_y)
         {
-            //world.dcamera.  <----- I FINISHED HERE LAST NIGHT!
+            world_camera_pos.y += joy_y_n;
+            world_camera_pos.x += joy_x_n;
+        }
+        else
+        {
+            world_camera_pos.z += joy_y_n;
+            world_camera_pos.x += joy_x_n;
         }
 
         // sleep
@@ -92,6 +98,7 @@ void Cube_Thread(void) {
 
     /*************YOUR CODE HERE*************/
     // Get spawn coordinates from FIFO, set cube.x, cube.y, cube.z
+
 
     cube.width = 50;
     cube.height = 50;
@@ -222,7 +229,7 @@ void Read_JoystickPress() {
         sleep(100);
 
         // Read the joystick switch status on the Multimod board.
-
+        // Why do I need to do this? Can I just flip joystick_y? If we are here means joy was pressed
 
         // Toggle the joystick_y flag.
         joystick_y = !joystick_y;
@@ -241,18 +248,19 @@ void Read_JoystickPress() {
 void Print_WorldCoords(void) {
     // Print the camera position through UART to display on console.
     G8RTOS_WaitSemaphore(&sem_UART);
-    UARTprintf("Cam Pos, X: %d, : %d, Z:, %d\n", )
+    UARTprintf("Cam Pos, X: %d, Y: %d, Z:, %d\n", world_camera_pos.x, world_camera_pos.y, world_camera_pos.z);
+    G8RTOS_SignalSemaphore(&sem_UART);
 }
 
 void Get_Joystick(void) {
     // Read the joystick
     // Trigger the ADC conversion
-    ADC0_PSSI_R = ADC_PSSI_SS3;
+    ADC0_PSSI_R = ADC_PSSI_SS2;
 
     // Wait for the conversion to complete
-    while ((ADC0_RIS_R & ADC_RIS_INR3) == 0);
-    uint32_t joy_x =  ADC0_SSFIFO3_R;
-    uint32_t joy_y = ADC0_SSFIFO3_R;
+    while ((ADC0_RIS_R & ADC_RIS_INR2) == 0);
+    uint32_t joy_x =  ADC0_SSFIFO2_R;
+    uint32_t joy_y = ADC0_SSFIFO2_R;
     // Send through FIFO.
     G8RTOS_WriteFIFO(JOYSTICK_FIFO, joy_x);
     G8RTOS_WriteFIFO(JOYSTICK_FIFO, joy_y);

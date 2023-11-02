@@ -28,12 +28,22 @@ void JOYSTICK_Init(void) {
     // Disable adc
     SysCtlPeripheralDisable(SYSCTL_PERIPH_ADC0);
 
+    //SYSCTL_RCGCADC_R |= SYSCTL_RCGCADC_R0;
+    GPIO_PORTE_DIR_R &= ~0x0000000C;
+    GPIO_PORTE_DEN_R &= ~0x0000000C;
+    //GPIO_PORTE_AFSEL_R |= 0x0000000C;
+    //GPIO_PORTE_AMSEL_R |=
+
+
     // Enable gpio port
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOD);
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
 
+
     GPIO_PORTD_PUR_R |= 0x00000002;
     GPIO_PORTD_DIR_R &= ~0x00000002;
+    GPIO_PORTD_DEN_R |= 0x00000002;
+
 
     // Enable adc module
     SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
@@ -42,13 +52,13 @@ void JOYSTICK_Init(void) {
     GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_3 | GPIO_PIN_2);
 
     // Configure ADC sequences
-    ADCSequenceConfigure(ADC0_BASE, 3, ADC_TRIGGER_PROCESSOR, 0);
-    ADCSequenceStepConfigure(ADC0_BASE, 3, 0, ADC_CTL_CH1); // joy x PE2
-    ADCSequenceStepConfigure(ADC0_BASE, 3, 1, ADC_CTL_CH0 | ADC_CTL_IE | ADC_CTL_END); // joy y PE3
+    ADCSequenceConfigure(ADC0_BASE, 2, ADC_TRIGGER_PROCESSOR, 0);
+    ADCSequenceStepConfigure(ADC0_BASE, 2, 0, ADC_CTL_CH1); // joy x PE2
+    ADCSequenceStepConfigure(ADC0_BASE, 2, 1, ADC_CTL_CH0 | ADC_CTL_IE | ADC_CTL_END); // joy y PE3
 
 
     // Enable ADC sequence
-    ADCSequenceEnable(ADC0_BASE, 3);
+    ADCSequenceEnable(ADC0_BASE, 2);
 
 }
 
@@ -66,7 +76,8 @@ void JOYSTICK_IntEnable() {
 // Gets button reading
 // Return: bool
 uint8_t JOYSTICK_GetPress() {
-    if (GPIOPinRead(JOYSTICK_INT_GPIO_BASE, GPIO_PIN_0)) {
+    // I DON'T KNOW WHY GPIO_PIN_0 WAS HERE IN THE TEMPLATE!! I changed it to pin 2
+    if (GPIOPinRead(JOYSTICK_INT_GPIO_BASE, GPIO_PIN_2)) {
         return 0;
     }
 

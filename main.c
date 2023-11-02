@@ -145,7 +145,9 @@ int main(void)
     G8RTOS_Add_APeriodicEvent(aperiodic_task, 4, 46);
     G8RTOS_Add_APeriodicEvent(GPIOE_Handler, 4, 20);
 
-    G8RTOS_Add_PeriodicEvent(periodic_task, 400, SystemTime + 100);
+    //G8RTOS_Add_PeriodicEvent(periodic_task, 100, SystemTime + 100);
+    G8RTOS_Add_PeriodicEvent(Print_WorldCoords, 100, SystemTime);
+    G8RTOS_Add_PeriodicEvent(Get_Joystick, 100, SystemTime + 1);
 
 
     G8RTOS_InitFIFO(0);
