@@ -54,15 +54,36 @@ void Idle_Thread(void) {
 
 void CamMove_Thread(void) {
     // Initialize / declare any variables here
+    int32_t joy_x, joy_y = 0;
+    int32_t joy_x_n, joy_y_n = 0;
 
     while(1) {
         // Get result from joystick
+        joy_x = G8RTOS_ReadFIFO(JOYSTICK_FIFO);
+        joy_y = G8RTOS_ReadFIFO(JOYSTICK_FIFO);
         
         // If joystick axis within deadzone, set to 0. Otherwise normalize it.
+        if (joy_x > 100 || joy_x < -100)
+        {
+            joy_x_n = (joy_x * 1000) / 4095;
+        }
+        else
+            joy_x_n = 0;
+        if (joy_y > 100 || joy_y < -100)
+                {
+                    joy_y_n = (joy_y * 1000) / 4095;
+                }
+        else
+            joy_y_n = 0;
 
         // Update world camera position. Update y/z coordinates depending on the joystick toggle.
+        if (joystick_y)
+        {
+            //world.dcamera.  <----- I FINISHED HERE LAST NIGHT!
+        }
 
         // sleep
+        sleep(200);
     }
 }
 
@@ -175,7 +196,7 @@ void Read_Buttons() {
         // Wait for a signal to read the buttons on the Multimod board.
         G8RTOS_WaitSemaphore(&sem_PCA9555_Debounce);
         // Sleep to debounce
-        sleep(200);
+        sleep(100);
 
         // Read the buttons status on the Multimod board.
         buttons_read = MultimodButtons_Get();
@@ -196,16 +217,20 @@ void Read_JoystickPress() {
     
     while(1) {
         // Wait for a signal to read the joystick press
-
+        G8RTOS_WaitSemaphore(&sem_Joystick_Debounce);
         // Sleep to debounce
+        sleep(100);
 
         // Read the joystick switch status on the Multimod board.
 
+
         // Toggle the joystick_y flag.
+        joystick_y = !joystick_y;
 
         // Clear the interrupt
+        GPIOIntClear(GPIO_PORTD_BASE, GPIO_PIN_2);
         // Re-enable the interrupt so it can occur again.
-    
+        GPIOIntEnable(GPIO_PORTD_BASE, GPIO_PIN_2);
     }
 }
 
@@ -215,11 +240,22 @@ void Read_JoystickPress() {
 
 void Print_WorldCoords(void) {
     // Print the camera position through UART to display on console.
+    G8RTOS_WaitSemaphore(&sem_UART);
+    UARTprintf("Cam Pos, X: %d, : %d, Z:, %d\n", )
 }
 
 void Get_Joystick(void) {
     // Read the joystick
+    // Trigger the ADC conversion
+    ADC0_PSSI_R = ADC_PSSI_SS3;
+
+    // Wait for the conversion to complete
+    while ((ADC0_RIS_R & ADC_RIS_INR3) == 0);
+    uint32_t joy_x =  ADC0_SSFIFO3_R;
+    uint32_t joy_y = ADC0_SSFIFO3_R;
     // Send through FIFO.
+    G8RTOS_WriteFIFO(JOYSTICK_FIFO, joy_x);
+    G8RTOS_WriteFIFO(JOYSTICK_FIFO, joy_y);
 }
 
 
@@ -236,5 +272,7 @@ void GPIOE_Handler() {
 
 void GPIOD_Handler() {
     // Disable interrupt
+    GPIOIntDisable(GPIO_PORTD_BASE, GPIO_PIN_2);
     // Signal relevant semaphore
+    G8RTOS_SignalSemaphore(&sem_Joystick_Debounce);
 }

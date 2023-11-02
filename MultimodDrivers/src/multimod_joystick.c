@@ -29,13 +29,26 @@ void JOYSTICK_Init(void) {
     SysCtlPeripheralDisable(SYSCTL_PERIPH_ADC0);
 
     // Enable gpio port
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOD);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
+
+    GPIO_PORTD_PUR_R |= 0x00000002;
+    GPIO_PORTD_DIR_R &= ~0x00000002;
+
     // Enable adc module
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_ADC0);
 
     // Set pins as ADC
+    GPIOPinTypeADC(GPIO_PORTE_BASE, GPIO_PIN_3 | GPIO_PIN_2);
 
     // Configure ADC sequences
+    ADCSequenceConfigure(ADC0_BASE, 3, ADC_TRIGGER_PROCESSOR, 0);
+    ADCSequenceStepConfigure(ADC0_BASE, 3, 0, ADC_CTL_CH1); // joy x PE2
+    ADCSequenceStepConfigure(ADC0_BASE, 3, 1, ADC_CTL_CH0 | ADC_CTL_IE | ADC_CTL_END); // joy y PE3
+
 
     // Enable ADC sequence
+    ADCSequenceEnable(ADC0_BASE, 3);
 
 }
 

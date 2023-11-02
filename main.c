@@ -121,8 +121,9 @@ int main(void)
         GPIO_PORTF_PUR_R |= 0x00000011;
         GPIO_PORTE_PUR_R |= 0x00000010;
 
+
         // Use SW1 & SW2, configure as inputs.
-        GPIO_PORTF_DIR_R |= ~0x00000011; // set pins 0 and 4 as inputs //I think this is wrong
+        GPIO_PORTF_DIR_R &= ~0x00000011; // set pins 0 and 4 as inputs //I think this is wrong
 
 
     G8RTOS_Init();
@@ -148,6 +149,7 @@ int main(void)
 
 
     G8RTOS_InitFIFO(0);
+    G8RTOS_InitFIFO(JOYSTICK_FIFO);
 
 
     G8RTOS_Launch();
