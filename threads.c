@@ -169,18 +169,24 @@ void Cube_Thread(void) {
 
 void Read_Buttons() {
     // Initialize / declare any variables here
+    uint8_t buttons_read = 0;
     
     while(1) {
         // Wait for a signal to read the buttons on the Multimod board.
-
+        G8RTOS_WaitSemaphore(&sem_PCA9555_Debounce);
         // Sleep to debounce
+        sleep(200);
 
         // Read the buttons status on the Multimod board.
+        buttons_read = MultimodButtons_Get();
 
         // Process the buttons and determine what actions need to be performed.
+        UARTprintf("Buttons pressed: %d\n", buttons_read);
 
         // Clear the interrupt
+        GPIOIntClear(GPIO_PORTE_BASE, GPIO_PIN_4);
         // Re-enable the interrupt so it can occur again.
+        GPIOIntEnable(GPIO_PORTE_BASE, GPIO_PIN_4);
     
     }
 }
@@ -222,7 +228,10 @@ void Get_Joystick(void) {
 
 void GPIOE_Handler() {
     // Disable interrupt
+
+    GPIOIntDisable(GPIO_PORTE_BASE, GPIO_PIN_4);
     // Signal relevant semaphore
+    G8RTOS_SignalSemaphore(&sem_PCA9555_Debounce);
 }
 
 void GPIOD_Handler() {

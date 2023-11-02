@@ -308,7 +308,7 @@ void ST7789_Init() {
 // Return: void
 void ST7789_DrawPixel(uint16_t x, uint16_t y, uint16_t color) {
     // Check boundary conditions
-    if (x < 0  || x > 239 || y < 0 || y > 319)
+    if ( x > 239 || y > 319)
             {
                 // Invalid parameters, handle or return an error
                 return;

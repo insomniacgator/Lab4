@@ -94,11 +94,11 @@ int main(void)
 {
     // Sets clock speed to 80 MHz. You'll need it!
     SysCtlClockSet(SYSCTL_SYSDIV_2_5 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN | SYSCTL_XTAL_16MHZ);
-    G8RTOS_Init();
-    multimod_init();
+
 
     // Init button+interrupt stuff
     SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOE);
     //SYSCTL_RCGCGPIO_R |= SYSCTL_RCGCGPIO_R5; // here we can use either one;
     // Enable relevant port for launchpad switches
     //GPIO_PORTF_DEN_R |= 0x00000001; // digital enable PF0
@@ -115,19 +115,22 @@ int main(void)
         GPIO_PORTF_DEN_R |= 0x00000001; // digital enable PF0
         GPIO_PORTF_DEN_R |= 0x00000010; // digital enable PF4
 
+        GPIO_PORTE_DEN_R |= 0x00000010; // digital enable PF4
+
         // set up pull up resistors (do I even need this?)
         GPIO_PORTF_PUR_R |= 0x00000011;
+        GPIO_PORTE_PUR_R |= 0x00000010;
 
         // Use SW1 & SW2, configure as inputs.
         GPIO_PORTF_DIR_R |= ~0x00000011; // set pins 0 and 4 as inputs //I think this is wrong
 
 
+    G8RTOS_Init();
+    multimod_init();
 
-    //GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, GPIO_PIN_4);
 
     GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_PIN_0, GPIO_FALLING_EDGE);
     GPIOIntEnable(GPIO_PORTF_BASE, GPIO_INT_PIN_0);
-    //IntPrioritySet(INT_GPIOF, 0xE0);
 
 
 
@@ -135,12 +138,13 @@ int main(void)
     G8RTOS_InitSemaphore(&sem_UART, 1);
     G8RTOS_AddThread(task0, 8, "task 0");
     G8RTOS_AddThread(task1, 2, "task 1");
-    //G8RTOS_AddThread(task2, 3, "task 2");
+    G8RTOS_AddThread(Read_Buttons, 3, "read_buttons");
     G8RTOS_AddThread(idle, 255, "idle");
-    //G8RTOS_AddPThread()
-    //G8RTOS_Add_APeriodicEvent(aperiodic_task, 4, 46);
 
-    //G8RTOS_Add_PeriodicEvent(periodic_task, 400, SystemTime + 100);
+    G8RTOS_Add_APeriodicEvent(aperiodic_task, 4, 46);
+    G8RTOS_Add_APeriodicEvent(GPIOE_Handler, 4, 20);
+
+    G8RTOS_Add_PeriodicEvent(periodic_task, 400, SystemTime + 100);
 
 
     G8RTOS_InitFIFO(0);

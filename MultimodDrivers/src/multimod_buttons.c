@@ -24,7 +24,9 @@
 // Return: void
 void MultimodButtons_Init() {
     // Initialize this function & the relevant interrupt pin
-
+    I2C_Init(I2C_A_BASE);
+    GPIOIntTypeSet(GPIO_PORTE_BASE, GPIO_PIN_4, GPIO_FALLING_EDGE);
+    GPIOIntEnable(GPIO_PORTE_BASE, GPIO_INT_PIN_4);
 
 /*
 
@@ -49,5 +51,13 @@ I2CBUS_A_SCL = PA6 (I2C1SCL)
 // Return: uint8_t 
 uint8_t MultimodButtons_Get() {
     // complete this function
+    uint8_t read_data = 0;
+
+
+    I2C_WriteSingle(I2C1_BASE, BUTTONS_PCA9555_GPIO_ADDR, 0x00);
+    read_data = I2C_ReadSingle(I2C1_BASE, BUTTONS_PCA9555_GPIO_ADDR);
+    //I2C_ReadMultiple(I2C1_BASE, BUTTONS_PCA9555_GPIO_ADDR, read_data, 2);
+
+    return read_data;
 }
 
