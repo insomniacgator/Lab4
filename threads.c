@@ -63,13 +63,13 @@ void CamMove_Thread(void) {
         joy_y = G8RTOS_ReadFIFO(JOYSTICK_FIFO);
         
         // If joystick axis within deadzone, set to 0. Otherwise normalize it.
-        if (joy_x < 2000 || joy_x > 2100)
+        if (joy_x < 1900 || joy_x > 2200)
         {
             joy_x_n = (2.0 * (joy_x - 0) / (4095 - 0)) - 1.0;
         }
         else
             joy_x_n = 0;
-        if (joy_y < 2000 || joy_y > 2100)
+        if (joy_y < 1900 || joy_y > 2200)
                 {
                     joy_y_n = (2.0 * (joy_y - 0) / (4095 - 0)) - 1.0;
                 }
@@ -169,7 +169,9 @@ void Cube_Thread(void) {
             G8RTOS_WaitSemaphore(&sem_KillCube);
             kill = 0;
             G8RTOS_KillSelf();
+            ST7789_Fill(0);
             G8RTOS_SignalSemaphore(&sem_KillCube);
+            sleep(100);
         }
 
         // Calculates view relative to camera position / orientation
@@ -231,18 +233,18 @@ void Read_Buttons() {
         G8RTOS_SignalSemaphore(&sem_I2CA);
 
         // Process the buttons and determine what actions need to be performed.
-
-
         if ( ((buttons_read >> 1) & 1 ) == 0 ) // SW 1 multimod pressed
         {
             //UARTprintf("Button 1 pressed\n");
 
+            // random values within ranges -100, 100
             rand_x = rand() % (100 + 1 - (-100)) + (-100);
             rand_y = rand() % (100 + 1 - (-100)) + (-100);
+            // random values within ranges -120, -20
             rand_z = rand() % (-20 + 1 - (-120)) + (-120);
 
 
-            //if (NumberOfThreads < )
+            // use 200 as offset because we cant send negative numbers over fifo
             G8RTOS_WriteFIFO(SPAWNCOOR_FIFO, (uint32_t)(rand_x + 200));
             G8RTOS_WriteFIFO(SPAWNCOOR_FIFO, (uint32_t)(rand_y + 200));
             G8RTOS_WriteFIFO(SPAWNCOOR_FIFO, (uint32_t)(rand_z + 200));
@@ -255,7 +257,8 @@ void Read_Buttons() {
         }
         if ( ((buttons_read >> 2) & 1) == 0 ) // SW 2 multimod pressed
         {
-            UARTprintf("Button 2 pressed\n");
+            //UARTprintf("Button 2 pressed\n");
+            kill_cube = 1;
 
         }
 
@@ -298,7 +301,7 @@ void Read_JoystickPress() {
 void Print_WorldCoords(void) {
     // Print the camera position through UART to display on console.
     G8RTOS_WaitSemaphore(&sem_UART);
-    UARTprintf("Cam Pos, X: %d, Y: %d, Z:, %d\n", world_camera_pos.x, world_camera_pos.y, world_camera_pos.z);
+    UARTprintf("Cam Pos, X: %d, Y: %d, Z:, %d\n", (int32_t)world_camera_pos.x, (int32_t)world_camera_pos.y, (int32_t)world_camera_pos.z);
     G8RTOS_SignalSemaphore(&sem_UART);
 }
 

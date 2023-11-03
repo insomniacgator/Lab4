@@ -260,7 +260,7 @@ sched_ErrCode_t G8RTOS_AddThread(void (*threadToAdd)(void), uint8_t priority, ch
                 threadControlBlocks[0].asleep = 0;
             }
             // else
-            else if ( threadCounter <= MAX_THREADS) // we just keep filling that array until we get to MAX_THREADS
+            else if ( threadCounter < MAX_THREADS) // we just keep filling that array until we get to MAX_THREADS
             {
                 threadControlBlocks[threadCounter].previousTCB = tailTCB;
                 threadControlBlocks[threadCounter].nextTCB = headTCB;
@@ -292,7 +292,10 @@ sched_ErrCode_t G8RTOS_AddThread(void (*threadToAdd)(void), uint8_t priority, ch
                 {
                     index++;
                     if (index >= MAX_THREADS)
+                    {
+                        EndCriticalSection(IBit_State);
                         return THREAD_LIMIT_REACHED;
+                    }
                 }
                 // if we here it means that we found a dead thread at index
                 threadControlBlocks[index].previousTCB = tailTCB; // so point the new thread's previous pointer to the old tail
@@ -307,6 +310,11 @@ sched_ErrCode_t G8RTOS_AddThread(void (*threadToAdd)(void), uint8_t priority, ch
                 threadControlBlocks[index].priority = priority; // set priority
                 threadControlBlocks[index].ThreadID = threadCounter; // set threadID from threadCounter
 
+                // reset stack before?
+                for (int32_t i=0; i<STACKSIZE; i++)
+                {
+                    threadStacks[index][i] = 0;
+                }
 
                 threadStacks[index][STACKSIZE - 2] = (uint32_t)threadToAdd; //we set the function pointer into the PC register 2 spots
                 // the from bottom of the stack
@@ -350,10 +358,16 @@ sched_ErrCode_t G8RTOS_Add_APeriodicEvent(void (*AthreadToAdd)(void), uint8_t pr
     IBit_State = StartCriticalSection();
     // Check if IRQn is valid
     if ( IRQn >= 255 | IRQn <= 0)
+    {
+        EndCriticalSection(IBit_State);
         return IRQn_INVALID;
+    }
     // Check if priority is valid
     if (priority > 6)
+    {
+        EndCriticalSection(IBit_State);
         return HWI_PRIORITY_INVALID;
+    }
     // Set corresponding index in interrupt vector table to handler.
     uint32_t *vectors = (uint32_t*)HWREG(NVIC_VTABLE);
     vectors[IRQn] = (uint32_t) AthreadToAdd;
