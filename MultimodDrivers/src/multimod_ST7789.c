@@ -102,6 +102,7 @@ void ST7789_SetWindow(int16_t x, int16_t y, int16_t w, int16_t h) {
             // Invalid parameters, handle or return an error
             return;
         }
+    //ST7789_Select();
 
     // Set column address
     ST7789_WriteCommand(ST7789_CASET_ADDR); // Column Address Set command
@@ -119,6 +120,8 @@ void ST7789_SetWindow(int16_t x, int16_t y, int16_t w, int16_t h) {
 
     // Set register to write to as memory
     ST7789_WriteCommand(ST7789_RAMWR_ADDR);
+
+    //ST7789_Deselect();
 }
 
 // ST7789_DrawVLine
@@ -313,11 +316,13 @@ void ST7789_DrawPixel(uint16_t x, uint16_t y, uint16_t color) {
                 // Invalid parameters, handle or return an error
                 return;
             }
+        ST7789_Select();
         // Set window
         ST7789_SetWindow(x, y, 1, 1);
         // Set color
         ST7789_WriteData(color >> 8);   // Send high byte of color
         ST7789_WriteData(color & 0xFF); // Send low byte of color
+        ST7789_Deselect();
 }
 
 // ST7789_DrawPixel

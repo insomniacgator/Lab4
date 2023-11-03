@@ -29,10 +29,7 @@ void task0() {
         G8RTOS_SignalSemaphore(&sem_UART);
         counter0++;
 
-
-
         sleep(500);
-        //SysCtlDelay(delay_000_1_s);
     }
 }
 
@@ -46,7 +43,6 @@ void task1() {
             G8RTOS_SignalSemaphore(&sem_UART);
             counter1++;
             sleep(1000);
-            //SysCtlDelay(delay_000_1_s);
         }
 }
 
@@ -58,22 +54,18 @@ void task2() {
             G8RTOS_SignalSemaphore(&sem_UART);
             counter2++;
             sleep(1000);
-            //SysCtlDelay(delay_000_1_s);
         }
 }
 
 void aperiodic_task() {
     GPIOIntClear(GPIO_PORTF_BASE, GPIO_PIN_0);
     static uint32_t aperiodic_count = 0;
-    //G8RTOS_WaitSemaphore(&sem_UART);
     UARTprintf("Aperiodic counter is at: %d\n", aperiodic_count);
 
-    //G8RTOS_SignalSemaphore(&sem_UART);
     aperiodic_count++;
 }
 
 void periodic_task() {
-    //GPIOIntClear(GPIO_PORTF_BASE, GPIO_PIN_4);
     static uint32_t periodic_count = 0;
     G8RTOS_WaitSemaphore(&sem_UART);
     UARTprintf("This is a periodic counter is at: %d\n", periodic_count);
@@ -102,55 +94,64 @@ int main(void)
     //SYSCTL_RCGCGPIO_R |= SYSCTL_RCGCGPIO_R5; // here we can use either one;
     // Enable relevant port for launchpad switches
     //GPIO_PORTF_DEN_R |= 0x00000001; // digital enable PF0
-    GPIO_PORTF_DEN_R |= 0x00000010; // digital enable PF4
+    //GPIO_PORTF_DEN_R |= 0x00000010; // digital enable PF4
     // set up pull up resistors
     //GPIO_PORTF_PUR_R |= 0x00000010;
     // Configure SW1 input
     //GPIO_PORTF_DIR_R |= ~0x00000011; // set pins 0 and 4 as inputs
 
-    GPIO_PORTF_LOCK_R = GPIO_LOCK_KEY;
-        GPIO_PORTF_CR_R |= GPIO_PIN_0;
+    //GPIO_PORTF_LOCK_R = GPIO_LOCK_KEY;
+        //GPIO_PORTF_CR_R |= GPIO_PIN_0;
 
         // Enable port F for switches
-        GPIO_PORTF_DEN_R |= 0x00000001; // digital enable PF0
-        GPIO_PORTF_DEN_R |= 0x00000010; // digital enable PF4
+        //GPIO_PORTF_DEN_R |= 0x00000001; // digital enable PF0
+        //GPIO_PORTF_DEN_R |= 0x00000010; // digital enable PF4
 
         GPIO_PORTE_DEN_R |= 0x00000010; // digital enable PF4
 
         // set up pull up resistors (do I even need this?)
-        GPIO_PORTF_PUR_R |= 0x00000011;
+        //GPIO_PORTF_PUR_R |= 0x00000011;
         GPIO_PORTE_PUR_R |= 0x00000010;
 
 
         // Use SW1 & SW2, configure as inputs.
-        GPIO_PORTF_DIR_R &= ~0x00000011; // set pins 0 and 4 as inputs //I think this is wrong
+        //GPIO_PORTF_DIR_R &= ~0x00000011; // set pins 0 and 4 as inputs //I think this is wrong
 
 
     G8RTOS_Init();
     multimod_init();
 
 
-    GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_PIN_0, GPIO_FALLING_EDGE);
-    GPIOIntEnable(GPIO_PORTF_BASE, GPIO_INT_PIN_0);
+    //GPIOIntTypeSet(GPIO_PORTF_BASE, GPIO_PIN_0, GPIO_FALLING_EDGE);
+    //GPIOIntEnable(GPIO_PORTF_BASE, GPIO_INT_PIN_0);
 
 
 
     // Add threads, semaphores, here
     G8RTOS_InitSemaphore(&sem_UART, 1);
-    G8RTOS_AddThread(task0, 8, "task 0");
-    G8RTOS_AddThread(task1, 2, "task 1");
+    G8RTOS_InitSemaphore(&sem_SPIA, 1);
+    G8RTOS_InitSemaphore(&sem_I2CA, 1);
+    G8RTOS_InitSemaphore(&sem_PCA9555_Debounce, 1);
+    G8RTOS_InitSemaphore(&sem_Joystick_Debounce, 1);
+    G8RTOS_InitSemaphore(&sem_KillCube, 1);
+
+    //G8RTOS_AddThread(task0, 8, "task 0");
+    //G8RTOS_AddThread(task1, 2, "task 1");
     G8RTOS_AddThread(Read_Buttons, 3, "read_buttons");
+    G8RTOS_AddThread(Read_JoystickPress, 3, "read_joystickpress");
+    G8RTOS_AddThread(CamMove_Thread, 3, "cammove_thread");
     G8RTOS_AddThread(idle, 255, "idle");
 
-    G8RTOS_Add_APeriodicEvent(aperiodic_task, 4, 46);
+    //G8RTOS_Add_APeriodicEvent(aperiodic_task, 4, 46);
     G8RTOS_Add_APeriodicEvent(GPIOE_Handler, 4, 20);
+    G8RTOS_Add_APeriodicEvent(GPIOD_Handler, 4, 19);
 
     //G8RTOS_Add_PeriodicEvent(periodic_task, 100, SystemTime + 100);
     G8RTOS_Add_PeriodicEvent(Print_WorldCoords, 100, SystemTime);
     G8RTOS_Add_PeriodicEvent(Get_Joystick, 100, SystemTime + 1);
 
 
-    G8RTOS_InitFIFO(0);
+    G8RTOS_InitFIFO(SPAWNCOOR_FIFO);
     G8RTOS_InitFIFO(JOYSTICK_FIFO);
 
 

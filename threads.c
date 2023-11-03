@@ -55,7 +55,7 @@ void Idle_Thread(void) {
 void CamMove_Thread(void) {
     // Initialize / declare any variables here
     int32_t joy_x, joy_y = 0;
-    int32_t joy_x_n, joy_y_n = 0;
+    float joy_x_n, joy_y_n = 0;
 
     while(1) {
         // Get result from joystick
@@ -63,15 +63,15 @@ void CamMove_Thread(void) {
         joy_y = G8RTOS_ReadFIFO(JOYSTICK_FIFO);
         
         // If joystick axis within deadzone, set to 0. Otherwise normalize it.
-        if (joy_x > 100 || joy_x < -100)
+        if (joy_x < 2000 || joy_x > 2100)
         {
-            joy_x_n = (joy_x * 1000) / 4095;
+            joy_x_n = (2.0 * (joy_x - 0) / (4095 - 0)) - 1.0;
         }
         else
             joy_x_n = 0;
-        if (joy_y > 100 || joy_y < -100)
+        if (joy_y < 2000 || joy_y > 2100)
                 {
-                    joy_y_n = (joy_y * 1000) / 4095;
+                    joy_y_n = (2.0 * (joy_y - 0) / (4095 - 0)) - 1.0;
                 }
         else
             joy_y_n = 0;
@@ -79,26 +79,29 @@ void CamMove_Thread(void) {
         // Update world camera position. Update y/z coordinates depending on the joystick toggle.
         if (joystick_y)
         {
-            world_camera_pos.y += joy_y_n;
-            world_camera_pos.x += joy_x_n;
+            world_camera_pos.x += -joy_y_n;
+            world_camera_pos.y += joy_x_n;
         }
         else
         {
-            world_camera_pos.z += joy_y_n;
-            world_camera_pos.x += joy_x_n;
+            world_camera_pos.x += -joy_y_n;
+            world_camera_pos.z += joy_x_n;
         }
 
         // sleep
-        sleep(200);
+        sleep(10);
     }
 }
 
 void Cube_Thread(void) {
     cube_t cube;
 
+    //UARTprintf("Cube Thread started\n");
     /*************YOUR CODE HERE*************/
     // Get spawn coordinates from FIFO, set cube.x, cube.y, cube.z
-
+    cube.x_pos = G8RTOS_ReadFIFO(SPAWNCOOR_FIFO) - 200;
+    cube.y_pos = G8RTOS_ReadFIFO(SPAWNCOOR_FIFO) - 200;
+    cube.z_pos = G8RTOS_ReadFIFO(SPAWNCOOR_FIFO) - 200;
 
     cube.width = 50;
     cube.height = 50;
@@ -122,6 +125,13 @@ void Cube_Thread(void) {
     while(1) {
         /*************YOUR CODE HERE*************/
         // Check if kill ball flag is set.
+        if (kill_cube)
+        {
+            G8RTOS_WaitSemaphore(&sem_KillCube);
+            kill = kill_cube;
+            kill_cube = 0;
+            G8RTOS_SignalSemaphore(&sem_KillCube);
+        }
 
         camera_pos.x = world_camera_pos.x;
         camera_pos.y = world_camera_pos.y;
@@ -142,17 +152,25 @@ void Cube_Thread(void) {
                 getViewOnScreen(&projected_point, &camera_frame_offset, &(interpolated_points[i][j]));
                 /*************YOUR CODE HERE*************/
                 // Wait on SPI bus
+                G8RTOS_WaitSemaphore(&sem_SPIA);
 
                 ST7789_DrawPixel(projected_point.x, projected_point.y, ST7789_BLACK);
 
                 /*************YOUR CODE HERE*************/
                 // Signal that SPI bus is available
-
+                G8RTOS_SignalSemaphore(&sem_SPIA);
             }
         }
 
         /*************YOUR CODE HERE*************/
         // If ball marked for termination, kill the thread.
+        if (kill)
+        {
+            G8RTOS_WaitSemaphore(&sem_KillCube);
+            kill = 0;
+            G8RTOS_KillSelf();
+            G8RTOS_SignalSemaphore(&sem_KillCube);
+        }
 
         // Calculates view relative to camera position / orientation
         for (int i = 0; i < 8; i++) {
@@ -180,24 +198,26 @@ void Cube_Thread(void) {
                 if (interpolated_points[i][j].z < 0) {
                     /*************YOUR CODE HERE*************/
                     // Wait on SPI bus
-
+                    G8RTOS_WaitSemaphore(&sem_SPIA);
                     ST7789_DrawPixel(projected_point.x, projected_point.y, ST7789_BLUE);
 
                     /*************YOUR CODE HERE*************/
                     // Signal that SPI bus is available
+                    G8RTOS_SignalSemaphore(&sem_SPIA);
                 }
             }
         }
 
         /*************YOUR CODE HERE*************/
         // Sleep
-
+        sleep(10);
     }
 }
 
 void Read_Buttons() {
     // Initialize / declare any variables here
     uint8_t buttons_read = 0;
+    int32_t rand_x, rand_y, rand_z = 0;
     
     while(1) {
         // Wait for a signal to read the buttons on the Multimod board.
@@ -206,10 +226,39 @@ void Read_Buttons() {
         sleep(100);
 
         // Read the buttons status on the Multimod board.
+        G8RTOS_WaitSemaphore(&sem_I2CA);
         buttons_read = MultimodButtons_Get();
+        G8RTOS_SignalSemaphore(&sem_I2CA);
 
         // Process the buttons and determine what actions need to be performed.
-        UARTprintf("Buttons pressed: %d\n", buttons_read);
+
+
+        if ( ((buttons_read >> 1) & 1 ) == 0 ) // SW 1 multimod pressed
+        {
+            //UARTprintf("Button 1 pressed\n");
+
+            rand_x = rand() % (100 + 1 - (-100)) + (-100);
+            rand_y = rand() % (100 + 1 - (-100)) + (-100);
+            rand_z = rand() % (-20 + 1 - (-120)) + (-120);
+
+
+            //if (NumberOfThreads < )
+            G8RTOS_WriteFIFO(SPAWNCOOR_FIFO, (uint32_t)(rand_x + 200));
+            G8RTOS_WriteFIFO(SPAWNCOOR_FIFO, (uint32_t)(rand_y + 200));
+            G8RTOS_WriteFIFO(SPAWNCOOR_FIFO, (uint32_t)(rand_z + 200));
+            if ( G8RTOS_AddThread(Cube_Thread, 3, "cube_thread") ) // if error returned when adding thread we remove from FIFO.
+            {
+                G8RTOS_ReadFIFO(SPAWNCOOR_FIFO);
+                G8RTOS_ReadFIFO(SPAWNCOOR_FIFO);
+                G8RTOS_ReadFIFO(SPAWNCOOR_FIFO);
+            }
+        }
+        if ( ((buttons_read >> 2) & 1) == 0 ) // SW 2 multimod pressed
+        {
+            UARTprintf("Button 2 pressed\n");
+
+        }
+
 
         // Clear the interrupt
         GPIOIntClear(GPIO_PORTE_BASE, GPIO_PIN_4);
@@ -226,13 +275,14 @@ void Read_JoystickPress() {
         // Wait for a signal to read the joystick press
         G8RTOS_WaitSemaphore(&sem_Joystick_Debounce);
         // Sleep to debounce
-        sleep(100);
+        sleep(200);
 
         // Read the joystick switch status on the Multimod board.
         // Why do I need to do this? Can I just flip joystick_y? If we are here means joy was pressed
 
         // Toggle the joystick_y flag.
         joystick_y = !joystick_y;
+        UARTprintf("Joystick pressed\n");
 
         // Clear the interrupt
         GPIOIntClear(GPIO_PORTD_BASE, GPIO_PIN_2);

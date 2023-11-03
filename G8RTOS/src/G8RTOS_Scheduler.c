@@ -225,9 +225,12 @@ sched_ErrCode_t G8RTOS_AddThread(void (*threadToAdd)(void), uint8_t priority, ch
     //static int32_t thread_id = 0;
 
     // If number of threads is greater than the maximum number of threads
-        if ( NumberOfThreads > MAX_THREADS )
+        if ( NumberOfThreads >= MAX_THREADS )
+        {
             // return
+            EndCriticalSection(IBit_State);
             return THREAD_LIMIT_REACHED;
+        }
         // else
         else
         {

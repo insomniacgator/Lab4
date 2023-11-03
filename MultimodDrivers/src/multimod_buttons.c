@@ -24,9 +24,12 @@
 // Return: void
 void MultimodButtons_Init() {
     // Initialize this function & the relevant interrupt pin
+    //G8RTOS_WaitSemaphore(&sem_I2CA);
+
     I2C_Init(I2C_A_BASE);
     GPIOIntTypeSet(GPIO_PORTE_BASE, GPIO_PIN_4, GPIO_FALLING_EDGE);
     GPIOIntEnable(GPIO_PORTE_BASE, GPIO_INT_PIN_4);
+    //G8RTOS_SignalSemaphore(&sem_I2CA);
 
 /*
 

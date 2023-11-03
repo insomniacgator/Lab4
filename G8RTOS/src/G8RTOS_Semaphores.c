@@ -30,12 +30,12 @@
 void G8RTOS_InitSemaphore(semaphore_t* s, int32_t value) {
     // Replace with code from lab 3
     // check if value is greater than 0
-    if (value > 0)
+    //if (value > 0)
         *s = value; // since the semaphore is a pointer to a int32_t I get the int32_t first using *  then assign value(int32_t) to it.
-    else
-    {
+    //else
+    //{
         //handle error
-    }
+    //}
 }
 
 // G8RTOS_WaitSemaphore
