@@ -260,7 +260,7 @@ sched_ErrCode_t G8RTOS_AddThread(void (*threadToAdd)(void), uint8_t priority, ch
                 threadControlBlocks[0].asleep = 0;
             }
             // else
-            else if ( threadCounter < MAX_THREADS) // we just keep filling that array until we get to MAX_THREADS
+            else if ( threadCounter < MAX_THREADS) // we just keep filling that array until before we get to MAX_THREADS
             {
                 threadControlBlocks[threadCounter].previousTCB = tailTCB;
                 threadControlBlocks[threadCounter].nextTCB = headTCB;
