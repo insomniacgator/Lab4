@@ -31,6 +31,29 @@ semaphore_t sem_KillCube;
 /***********************************Semaphores**************************************/
 
 /***********************************Structures**************************************/
+// Character
+typedef struct character_t {
+    uint16_t x_pos;
+    uint16_t y_pos;
+    uint8_t width;
+    uint8_t length;
+    uint16_t cx_pos;
+    uint16_t cy_pos;
+
+} character_t;
+
+// Obstacle
+typedef struct obstacle_t {
+    uint16_t x_pos;
+    uint16_t y_pos;
+    uint8_t width;
+    uint8_t length;
+    uint16_t cx_pos;
+    uint16_t cy_pos;
+
+} obstacle_t;
+
+
 /***********************************Structures**************************************/
 
 
@@ -41,6 +64,10 @@ void Cube_Thread(void);
 void CamMove_Thread(void);
 void Read_Buttons(void);
 void Read_JoystickPress(void);
+
+//void Init_World(void);
+void DisplayUpdate_Thread(void);
+void CharacterMove_Thread(void);
 
 /*******************************Background Threads**********************************/
 

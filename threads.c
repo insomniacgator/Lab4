@@ -44,12 +44,21 @@ uint8_t kill_cube = 0;
 
 /*********************************Global Variables**********************************/
 
+
 /*************************************Threads***************************************/
 
 void Idle_Thread(void) {
     time_t t;
     srand((unsigned) time(&t));
     while(1);
+}
+
+void Init_World(void)
+{
+    G8RTOS_WaitSemaphore(&sem_SPIA);
+            //ST7789_DrawHLine(0, 100, 240, ST7789_WHITE);
+            ST7789_DrawLine(0, 100, 240, 100, ST7789_WHITE);
+            G8RTOS_SignalSemaphore(&sem_SPIA);
 }
 
 void CamMove_Thread(void) {
@@ -88,13 +97,207 @@ void CamMove_Thread(void) {
             world_camera_pos.z += joy_x_n;
         }
 
+
         // sleep
         sleep(10);
     }
 }
 
+void CharacterMove_Thread(void) {
+
+    character_t dino;
+    dino.x_pos = 10;
+    dino.y_pos = 101;
+    dino.length = 10;
+    dino.width = 5;
+
+    // Initialize / declare any variables here
+    int32_t joy_x, joy_y = 0;
+    float joy_x_n, joy_y_n = 0;
+    bool jump = 0;
+
+    while(1) {
+        // Get result from joystick
+        joy_x = G8RTOS_ReadFIFO(JOYSTICK_FIFO);
+        joy_y = G8RTOS_ReadFIFO(JOYSTICK_FIFO);
+
+        // If joystick axis within deadzone, set to 0. Otherwise normalize it.
+        if (joy_x < 1900 || joy_x > 2200)
+        {
+            joy_x_n = (2.0 * (joy_x - 0) / (4095 - 0)) - 1.0;
+        }
+        else
+            joy_x_n = 0;
+        if (joy_y < 1900 || joy_y > 2200)
+                {
+                    joy_y_n = (2.0 * (joy_y - 0) / (4095 - 0)) - 1.0;
+                    jump = 1;
+                    UARTprintf("jump\n");
+                }
+        else
+            joy_y_n = 0;
+
+        // Update world camera position. Update y/z coordinates depending on the joystick toggle.
+        if (joystick_y)
+        {
+            world_camera_pos.x += -joy_y_n;
+            world_camera_pos.y += joy_x_n;
+        }
+        else
+        {
+            world_camera_pos.x += -joy_y_n;
+            world_camera_pos.z += joy_x_n;
+        }
+
+        if (jump)
+        {
+            dino.y_pos++;
+        }
+
+        G8RTOS_WaitSemaphore(&sem_SPIA);
+        ST7789_DrawRectangle(dino.x_pos, dino.y_pos, dino.width, dino.length, ST7789_WHITE);
+        G8RTOS_SignalSemaphore(&sem_SPIA);
+
+        // sleep
+        sleep(10);
+    }
+}
+
+// We are goig
+void DisplayUpdate_Thread(void) {
+    cube_t cube;
+
+    G8RTOS_WaitSemaphore(&sem_SPIA);
+            ST7789_DrawLine(0, 100, 240, 100, ST7789_WHITE);
+            G8RTOS_SignalSemaphore(&sem_SPIA);
+
+
+
+    //UARTprintf("Cube Thread started\n");
+    /*************YOUR CODE HERE*************/
+    // Get spawn coordinates from FIFO, set cube.x, cube.y, cube.z
+    cube.x_pos = G8RTOS_ReadFIFO(SPAWNCOOR_FIFO) - 200;
+    cube.y_pos = G8RTOS_ReadFIFO(SPAWNCOOR_FIFO) - 200;
+    cube.z_pos = G8RTOS_ReadFIFO(SPAWNCOOR_FIFO) - 200;
+
+    cube.width = 50;
+    cube.height = 50;
+    cube.length = 50;
+
+    Quat_t v[8];
+    Quat_t v_relative[8];
+
+    Cube_Generate(v, &cube);
+
+    uint32_t m = Num_Interpolated_Points + 1;
+    Vect3D_t interpolated_points[12][Num_Interpolated_Points + 2];
+    Vect3D_t projected_point;
+
+    Quat_t camera_pos;
+    Quat_t camera_frame_offset;
+    Quat_t view_rot_inverse;
+
+    uint8_t kill = 0;
+
+    while(1) {
+        /*************YOUR CODE HERE*************/
+        // Check if kill ball flag is set.
+        if (kill_cube)
+        {
+            G8RTOS_WaitSemaphore(&sem_KillCube);
+            kill = kill_cube;
+            kill_cube = 0;
+            G8RTOS_SignalSemaphore(&sem_KillCube);
+        }
+
+        camera_pos.x = world_camera_pos.x;
+        camera_pos.y = world_camera_pos.y;
+        camera_pos.z = world_camera_pos.z;
+
+        camera_frame_offset.x = world_camera_frame_offset.x;
+        camera_frame_offset.y = world_camera_frame_offset.y;
+        camera_frame_offset.z = world_camera_frame_offset.z;
+
+        view_rot_inverse.w = world_view_rot_inverse.w;
+        view_rot_inverse.x = world_view_rot_inverse.x;
+        view_rot_inverse.y = world_view_rot_inverse.y;
+        view_rot_inverse.z = world_view_rot_inverse.z;
+
+        // Clears cube from screen
+        for (int i = 0; i < 12; i++) {
+            for (int j = 0; j < m+1; j++) {
+                getViewOnScreen(&projected_point, &camera_frame_offset, &(interpolated_points[i][j]));
+                /*************YOUR CODE HERE*************/
+                // Wait on SPI bus
+                G8RTOS_WaitSemaphore(&sem_SPIA);
+
+                ST7789_DrawPixel(projected_point.x, projected_point.y, ST7789_BLACK);
+
+                /*************YOUR CODE HERE*************/
+                // Signal that SPI bus is available
+                G8RTOS_SignalSemaphore(&sem_SPIA);
+            }
+        }
+
+        /*************YOUR CODE HERE*************/
+        // If ball marked for termination, kill the thread.
+        if (kill)
+        {
+            G8RTOS_WaitSemaphore(&sem_KillCube);
+            kill = 0;
+            G8RTOS_KillSelf();
+            ST7789_Fill(0);
+            G8RTOS_SignalSemaphore(&sem_KillCube);
+            sleep(100);
+        }
+
+        // Calculates view relative to camera position / orientation
+        for (int i = 0; i < 8; i++) {
+            getViewRelative(&(v_relative[i]), &camera_pos, &(v[i]), &view_rot_inverse);
+        }
+
+        // Interpolates points between vertices
+        interpolatePoints(interpolated_points[0], &v_relative[0], &v_relative[1], m);
+        interpolatePoints(interpolated_points[1], &v_relative[1], &v_relative[2], m);
+        interpolatePoints(interpolated_points[2], &v_relative[2], &v_relative[3], m);
+        interpolatePoints(interpolated_points[3], &v_relative[3], &v_relative[0], m);
+        interpolatePoints(interpolated_points[4], &v_relative[0], &v_relative[4], m);
+        interpolatePoints(interpolated_points[5], &v_relative[1], &v_relative[5], m);
+        interpolatePoints(interpolated_points[6], &v_relative[2], &v_relative[6], m);
+        interpolatePoints(interpolated_points[7], &v_relative[3], &v_relative[7], m);
+        interpolatePoints(interpolated_points[8], &v_relative[4], &v_relative[5], m);
+        interpolatePoints(interpolated_points[9], &v_relative[5], &v_relative[6], m);
+        interpolatePoints(interpolated_points[10], &v_relative[6], &v_relative[7], m);
+        interpolatePoints(interpolated_points[11], &v_relative[7], &v_relative[4], m);
+
+        for (int i = 0; i < 12; i++) {
+            for (int j = 0; j < m+1; j++) {
+                getViewOnScreen(&projected_point, &camera_frame_offset, &(interpolated_points[i][j]));
+
+                if (interpolated_points[i][j].z < 0) {
+                    /*************YOUR CODE HERE*************/
+                    // Wait on SPI bus
+                    G8RTOS_WaitSemaphore(&sem_SPIA);
+                    ST7789_DrawPixel(projected_point.x, projected_point.y, ST7789_BLUE);
+
+                    /*************YOUR CODE HERE*************/
+                    // Signal that SPI bus is available
+                    G8RTOS_SignalSemaphore(&sem_SPIA);
+                }
+            }
+        }
+
+        /*************YOUR CODE HERE*************/
+        // Sleep
+        sleep(10);
+    }
+}
+
+
 void Cube_Thread(void) {
     cube_t cube;
+
+
 
     //UARTprintf("Cube Thread started\n");
     /*************YOUR CODE HERE*************/

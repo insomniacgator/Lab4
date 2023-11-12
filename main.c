@@ -126,6 +126,8 @@ int main(void)
     //GPIOIntEnable(GPIO_PORTF_BASE, GPIO_INT_PIN_0);
 
 
+    // DINORUN semaphores: UART, SPI(lcd), Joystick, PCA9555,
+
 
     // Add threads, semaphores, here
     G8RTOS_InitSemaphore(&sem_UART, 1);
@@ -139,7 +141,9 @@ int main(void)
     //G8RTOS_AddThread(task1, 2, "task 1");
     G8RTOS_AddThread(Read_Buttons, 3, "read_buttons");
     G8RTOS_AddThread(Read_JoystickPress, 3, "read_joystickpress");
-    G8RTOS_AddThread(CamMove_Thread, 3, "cammove_thread");
+    //G8RTOS_AddThread(CamMove_Thread, 3, "cammove_thread");
+    G8RTOS_AddThread(CharacterMove_Thread, 3, "charactermove_thread");
+    G8RTOS_AddThread(DisplayUpdate_Thread, 3, "displayupdate_thread");
     G8RTOS_AddThread(idle, 255, "idle");
 
     //G8RTOS_Add_APeriodicEvent(aperiodic_task, 4, 46);
@@ -158,6 +162,7 @@ int main(void)
     G8RTOS_Launch();
 
     IntMasterEnable();
+    Init_World();
     while (1);
 }
 
