@@ -53,7 +53,8 @@ typedef struct obstacle_t {
 
 } obstacle_t;
 
-
+character_t dino;
+obstacle_t obs;
 /***********************************Structures**************************************/
 
 
@@ -64,6 +65,8 @@ void Cube_Thread(void);
 void CamMove_Thread(void);
 void Read_Buttons(void);
 void Read_JoystickPress(void);
+void ObstacleMove_Thread(void);
+void Check_Collision(void);
 
 //void Init_World(void);
 void DisplayUpdate_Thread(void);

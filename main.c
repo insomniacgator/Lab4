@@ -19,6 +19,10 @@
 extern uint32_t SystemTime;
 
 
+    //static uint8_t first_time = 0;
+
+
+
 // Complete the functions below as test threads.
 void task0() {
     uint32_t counter0 = 0;
@@ -84,6 +88,15 @@ void idle() {
 /************************************MAIN*******************************************/
 int main(void)
 {
+    dino.x_pos = 10;
+    dino.y_pos = 101;
+    dino.length = 10;
+    dino.width = 4;
+
+    obs.x_pos = 200;
+    obs.y_pos = 101;
+    obs.length = 10;
+    obs.width = 2;
     // Sets clock speed to 80 MHz. You'll need it!
     SysCtlClockSet(SYSCTL_SYSDIV_2_5 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN | SYSCTL_XTAL_16MHZ);
 
@@ -144,6 +157,8 @@ int main(void)
     //G8RTOS_AddThread(CamMove_Thread, 3, "cammove_thread");
     G8RTOS_AddThread(CharacterMove_Thread, 3, "charactermove_thread");
     G8RTOS_AddThread(DisplayUpdate_Thread, 3, "displayupdate_thread");
+    G8RTOS_AddThread(ObstacleMove_Thread, 3, "obstaclemove_thread");
+    G8RTOS_AddThread(Check_Collision, 3, "check_collision");
     G8RTOS_AddThread(idle, 255, "idle");
 
     //G8RTOS_Add_APeriodicEvent(aperiodic_task, 4, 46);
@@ -151,7 +166,7 @@ int main(void)
     G8RTOS_Add_APeriodicEvent(GPIOD_Handler, 4, 19);
 
     //G8RTOS_Add_PeriodicEvent(periodic_task, 100, SystemTime + 100);
-    G8RTOS_Add_PeriodicEvent(Print_WorldCoords, 100, SystemTime);
+    //G8RTOS_Add_PeriodicEvent(Print_WorldCoords, 100, SystemTime);
     G8RTOS_Add_PeriodicEvent(Get_Joystick, 100, SystemTime + 1);
 
 

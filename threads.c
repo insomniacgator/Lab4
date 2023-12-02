@@ -42,6 +42,8 @@ uint8_t joystick_y = 1;
 // Kill a cube?
 uint8_t kill_cube = 0;
 
+
+
 /*********************************Global Variables**********************************/
 
 
@@ -105,16 +107,13 @@ void CamMove_Thread(void) {
 
 void CharacterMove_Thread(void) {
 
-    character_t dino;
-    dino.x_pos = 10;
-    dino.y_pos = 101;
-    dino.length = 10;
-    dino.width = 5;
+
 
     // Initialize / declare any variables here
     int32_t joy_x, joy_y = 0;
     float joy_x_n, joy_y_n = 0;
     bool jump = 0;
+    bool falling = 0;
 
     while(1) {
         // Get result from joystick
@@ -137,29 +136,89 @@ void CharacterMove_Thread(void) {
         else
             joy_y_n = 0;
 
-        // Update world camera position. Update y/z coordinates depending on the joystick toggle.
-        if (joystick_y)
-        {
-            world_camera_pos.x += -joy_y_n;
-            world_camera_pos.y += joy_x_n;
-        }
-        else
-        {
-            world_camera_pos.x += -joy_y_n;
-            world_camera_pos.z += joy_x_n;
-        }
 
         if (jump)
         {
-            dino.y_pos++;
+            if (dino.y_pos < 140 && falling == 0)
+            {
+                dino.y_pos += 5;
+                if (dino.y_pos >= 140)
+                    falling = 1;
+                G8RTOS_WaitSemaphore(&sem_SPIA);
+                ST7789_DrawRectangle(dino.x_pos, dino.y_pos, dino.width, dino.length, ST7789_WHITE);
+                ST7789_DrawRectangle(dino.x_pos, dino.y_pos-5, dino.width, 5, ST7789_BLACK);
+                G8RTOS_SignalSemaphore(&sem_SPIA);
+            }
+            else
+            {
+                if (dino.y_pos >= 101 && falling == 1)
+                {
+                    dino.y_pos -= 5;
+                    if (dino.y_pos <= 101)
+                    {
+                        falling = 0;
+                        jump = 0;
+                    }
+                    ST7789_DrawRectangle(dino.x_pos, dino.y_pos, dino.width, dino.length, ST7789_WHITE);
+                    ST7789_DrawRectangle(dino.x_pos, dino.y_pos+5, dino.width, dino.length, ST7789_BLACK);
+                }
+                else
+                    jump = 0;
+            }
         }
 
-        G8RTOS_WaitSemaphore(&sem_SPIA);
+            // CONSIDER MOVING THIS DRAWING TO DISPLAY UPDATE THREAD
         ST7789_DrawRectangle(dino.x_pos, dino.y_pos, dino.width, dino.length, ST7789_WHITE);
-        G8RTOS_SignalSemaphore(&sem_SPIA);
 
         // sleep
         sleep(10);
+    }
+}
+
+void ObstacleMove_Thread(void) {
+
+
+
+
+    while(1) {
+
+        obs.x_pos -= 1;
+        G8RTOS_WaitSemaphore(&sem_SPIA);
+        ST7789_DrawRectangle(obs.x_pos, obs.y_pos, obs.width, obs.length, ST7789_GREEN);
+        ST7789_DrawRectangle(obs.x_pos+1, obs.y_pos, 1, obs.length, ST7789_BLACK);
+        G8RTOS_SignalSemaphore(&sem_SPIA);
+        if (obs.x_pos == 0)
+        {
+            obs.x_pos = 238;
+            G8RTOS_WaitSemaphore(&sem_SPIA);
+            ST7789_DrawRectangle(0, obs.y_pos, 2, obs.length, ST7789_BLACK);
+            G8RTOS_SignalSemaphore(&sem_SPIA);
+        }
+
+
+        // sleep
+        sleep(10);
+    }
+}
+
+void Check_Collision(void)
+{
+    while(1)
+    {
+        uint8_t x_diff = obs.x_pos - dino.x_pos;
+        uint8_t y_diff = dino.y_pos - obs.y_pos;
+        if (x_diff < 5 && y_diff < 8)
+        {
+            UARTprintf("COLLISION GAME OVER!!\n");
+            G8RTOS_WaitSemaphore(&sem_SPIA);
+            ST7789_Fill(0x001F);
+            G8RTOS_SignalSemaphore(&sem_SPIA);
+            G8RTOS_KillThread(3);
+            G8RTOS_KillThread(4);
+            G8RTOS_KillThread(5);
+
+        }
+        sleep(50);
     }
 }
 
